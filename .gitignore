@@ -71,4 +71,4 @@ docs/_build/
 
 # PM2 (Process Manager)
 .pm2/
-pm2-*.log
+pm2-*.logpnpm-lock.yaml 
