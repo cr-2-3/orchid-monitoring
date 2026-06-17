@@ -1,0 +1,36 @@
+<!-- views/partials/nav.ejs -->
+<!-- Partial de navegación (si se usa separado del header) -->
+
+<nav class="nav-container">
+    <a href="/" class="logo">
+        <span class="logo-icon">🌺</span>
+        <span>OrchidMonitor</span>
+    </a>
+    <ul class="nav-menu">
+        <li>
+            <a href="/" class="nav-link <%= currentPath === '/' ? 'active' : '' %>">
+                Dashboard
+            </a>
+        </li>
+        <li>
+            <a href="/dashboard" class="nav-link <%= currentPath === '/dashboard' ? 'active' : '' %>">
+                Tiempo Real
+            </a>
+        </li>
+        <li>
+            <a href="/schedule" class="nav-link <%= currentPath === '/schedule' ? 'active' : '' %>">
+                Calendario
+            </a>
+        </li>
+        <li>
+            <a href="/sensors" class="nav-link <%= currentPath === '/sensors' ? 'active' : '' %>">
+                Sensores
+            </a>
+        </li>
+        <li>
+            <a href="/history" class="nav-link <%= currentPath === '/history' ? 'active' : '' %>">
+                Historial
+            </a>
+        </li>
+    </ul>
+</nav>

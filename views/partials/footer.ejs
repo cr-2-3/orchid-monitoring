@@ -1,0 +1,114 @@
+<!-- Footer Scripts -->
+    <script>
+        // Inicializar Socket.IO si está disponible
+        if (typeof io !== 'undefined') {
+            const socket = io();
+            
+            // Manejar conexión
+            socket.on('connect', () => {
+                console.log('✅ Conectado al servidor WebSocket');
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('❌ Desconectado del servidor WebSocket');
+            });
+            
+            // Manejar notificaciones de riego
+            socket.on('wateringNotification', (data) => {
+                showNotification(`🚿 Hora de riego: ${data.name}`, 'info');
+            });
+            
+            // Manejar nuevas lecturas
+            socket.on('newReading', (data) => {
+                console.log('Nueva lectura recibida:', data);
+                // Actualizar UI si estamos en la página correcta
+                if (window.location.pathname === '/dashboard' && typeof updateDashboard === 'function') {
+                    updateDashboard(data);
+                }
+            });
+        }
+        
+        // Función global para mostrar notificaciones
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification alert-${type}`;
+            notification.innerHTML = `
+                <span>${message}</span>
+            `;
+            document.body.appendChild(notification);
+            
+            // Mostrar notificación
+            setTimeout(() => {
+                notification.style.display = 'block';
+            }, 100);
+            
+            // Ocultar después de 5 segundos
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 5000);
+        }
+        
+        // Agregar animación de salida al CSS
+        if (!document.querySelector('#notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'notification-styles';
+            style.textContent = `
+                @keyframes slideOut {
+                    from {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                }
+                
+                .notification {
+                    display: none;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Función para formatear fechas
+        function formatDate(date) {
+            return new Date(date).toLocaleString('es-CL', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // Función para formatear números
+        function formatNumber(number, decimals = 1) {
+            return parseFloat(number).toFixed(decimals);
+        }
+        
+        // Detectar errores globales
+        window.addEventListener('error', (event) => {
+            console.error('Error detectado:', event.error);
+        });
+        
+        // Detectar errores de promesas no manejadas
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Promise rechazada:', event.reason);
+        });
+        
+        // Modo debug (solo en desarrollo)
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('🌺 Sistema de Monitoreo de Orquídeas - Modo Desarrollo');
+            console.log('📍 Ruta actual:', window.location.pathname);
+            console.log('🕐 Timestamp:', new Date().toISOString());
+        }
+    </script>
+    
+    <!-- Scripts adicionales específicos de página -->
+    <% if (typeof pageScript !== 'undefined' && pageScript) { %>
+        <script src="<%= pageScript %>"></script>
+    <% } %>
+</body>
+</html>

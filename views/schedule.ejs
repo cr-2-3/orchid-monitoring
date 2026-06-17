@@ -1,0 +1,312 @@
+<%- include('partials/header') %>
+
+<!-- ===== TOAST SYSTEM ===== -->
+<div id="toast-container" style="
+    position: fixed; top: 1.5rem; right: 1.5rem; z-index: 9999;
+    display: flex; flex-direction: column; gap: 0.75rem; pointer-events: none;
+"></div>
+
+<style>
+.toast {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    padding: 1rem 1.25rem; border-radius: 12px; min-width: 300px; max-width: 380px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18); pointer-events: all;
+    animation: slideIn 0.3s ease; font-size: 0.95rem;
+    border-left: 4px solid transparent;
+}
+.toast.success { background:#f0fdf4; border-color:#10b981; color:#065f46; }
+.toast.error   { background:#fef2f2; border-color:#ef4444; color:#7f1d1d; }
+.toast.info    { background:#eff6ff; border-color:#3b82f6; color:#1e3a8a; }
+.toast-icon  { font-size:1.2rem; flex-shrink:0; margin-top:0.1rem; }
+.toast-body  { flex:1; }
+.toast-title { font-weight:700; margin-bottom:0.2rem; }
+.toast-msg   { opacity:0.85; font-size:0.875rem; }
+.toast-close { background:none; border:none; cursor:pointer; opacity:0.5;
+               font-size:1.1rem; padding:0; line-height:1; flex-shrink:0; }
+.toast-close:hover { opacity:1; }
+.toast.hiding { animation: slideOut 0.3s ease forwards; }
+@keyframes slideIn  { from { transform:translateX(120%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+@keyframes slideOut { from { transform:translateX(0); opacity:1; } to { transform:translateX(120%); opacity:0; } }
+
+/* confirm modal */
+.confirm-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:8000;
+    display:flex; align-items:center; justify-content:center;
+    animation: fadeIn 0.2s ease;
+}
+.confirm-box {
+    background:#fff; border-radius:16px; padding:2rem; max-width:380px; width:90%;
+    box-shadow:0 20px 60px rgba(0,0,0,0.25); text-align:center;
+    animation: popIn 0.2s ease;
+}
+.confirm-icon { font-size:2.5rem; margin-bottom:0.75rem; }
+.confirm-title { font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-bottom:0.5rem; }
+.confirm-msg   { color:var(--text-secondary); font-size:0.9rem; margin-bottom:1.5rem; }
+.confirm-btns  { display:flex; gap:0.75rem; justify-content:center; }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes popIn  { from { transform:scale(0.9); opacity:0; } to { transform:scale(1); opacity:1; } }
+</style>
+
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Calendario de Riego</h1>
+        <p class="page-subtitle">Gestiona los horarios de riego para tus orquídeas</p>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header flex-between">
+            <h3 class="card-title">Horarios Programados</h3>
+            <button class="btn btn-primary" onclick="openModal()">➕ Nuevo Horario</button>
+        </div>
+        <div class="card-body">
+            <% if (schedules.length === 0) { %>
+                <div class="alert alert-info">
+                    <span>ℹ️</span>
+                    <span>No hay horarios configurados. Crea uno nuevo para comenzar.</span>
+                </div>
+            <% } else { %>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th><th>Días</th><th>Hora</th>
+                                <th>Estado</th><th>Notas</th><th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% schedules.forEach(schedule => {
+                                const days = schedule.days_of_week.split(',');
+                                const dayNames = {'0':'Dom','1':'Lun','2':'Mar','3':'Mié','4':'Jue','5':'Vie','6':'Sáb'};
+                                const dayLabels = days.map(d => dayNames[d]).join(', ');
+                            %>
+                            <tr id="row-<%= schedule.id %>">
+                                <td><strong><%= schedule.name %></strong></td>
+                                <td><%= dayLabels %></td>
+                                <td><%= schedule.time.substring(0,5) %></td>
+                                <td>
+                                    <span class="status-badge <%= schedule.active ? 'status-active' : 'status-inactive' %>">
+                                        <%= schedule.active ? '✓ Activo' : '✗ Inactivo' %>
+                                    </span>
+                                </td>
+                                <td><%= schedule.notes || '-' %></td>
+                                <td>
+                                    <button class="btn btn-secondary" onclick="editSchedule(<%= schedule.id %>)" style="padding:0.5rem 1rem;font-size:0.875rem;">✏️</button>
+                                    <button class="btn btn-danger"    onclick="deleteSchedule(<%= schedule.id %>, '<%= schedule.name %>')" style="padding:0.5rem 1rem;font-size:0.875rem;">🗑️</button>
+                                </td>
+                            </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recomendaciones de Riego</h3>
+            <span class="card-icon">💡</span>
+        </div>
+        <div class="card-body">
+            <ul style="list-style:none;padding:0;">
+                <li style="margin-bottom:0.75rem;"><strong>🌅 Riego matutino:</strong> Ideal entre las 7:00 y 9:00 AM</li>
+                <li style="margin-bottom:0.75rem;"><strong>🌡️ Evitar horas de calor:</strong> No regar entre 12:00 PM y 4:00 PM</li>
+                <li style="margin-bottom:0.75rem;"><strong>💧 Frecuencia:</strong> 2-3 veces por semana según la estación</li>
+                <li style="margin-bottom:0.75rem;"><strong>🌙 Riego nocturno:</strong> Opcional después de las 6:00 PM en climas secos</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Crear/Editar -->
+<div class="modal" id="scheduleModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="modalTitle">Nuevo Horario de Riego</h3>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <form id="scheduleForm" onsubmit="saveSchedule(event)">
+            <input type="hidden" id="schedule_id" name="schedule_id">
+            <div class="form-group">
+                <label class="form-label">Nombre del Horario</label>
+                <input type="text" class="form-input" id="name" name="name" required placeholder="Ej: Riego Matutino">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Días de la Semana</label>
+                <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0.5rem;">
+                    <% [['1','Lun'],['2','Mar'],['3','Mié'],['4','Jue'],['5','Vie'],['6','Sáb'],['0','Dom']].forEach(([val,label]) => { %>
+                    <label style="display:flex;flex-direction:column;align-items:center;padding:0.5rem;border:2px solid var(--border-color);border-radius:8px;cursor:pointer;">
+                        <input type="checkbox" name="days" value="<%= val %>" style="margin-bottom:0.25rem;">
+                        <span style="font-size:0.875rem;"><%= label %></span>
+                    </label>
+                    <% }); %>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Hora</label>
+                <input type="time" class="form-input" id="time" name="time" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Estado</label>
+                <select class="form-select" id="active" name="active">
+                    <option value="1">Activo</option>
+                    <option value="0">Inactivo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notas (opcional)</label>
+                <textarea class="form-textarea" id="notes" name="notes" placeholder="Información adicional sobre este horario"></textarea>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary" style="flex:1;">Guardar</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal()" style="flex:1;">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// ===== TOAST =====
+function showToast(type, title, msg) {
+    const icons = { success:'✅', error:'❌', info:'ℹ️' };
+    const container = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `
+        <span class="toast-icon">${icons[type]||'💬'}</span>
+        <div class="toast-body">
+            <div class="toast-title">${title}</div>
+            <div class="toast-msg">${msg}</div>
+        </div>
+        <button class="toast-close" onclick="removeToast(this.parentElement)">✕</button>
+    `;
+    container.appendChild(t);
+    setTimeout(() => removeToast(t), 4000);
+}
+function removeToast(t) {
+    if (!t || t.classList.contains('hiding')) return;
+    t.classList.add('hiding');
+    setTimeout(() => t.remove(), 300);
+}
+
+// ===== CONFIRM DIALOG =====
+function showConfirm(title, msg, onConfirm) {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+        <div class="confirm-box">
+            <div class="confirm-icon">⚠️</div>
+            <div class="confirm-title">${title}</div>
+            <div class="confirm-msg">${msg}</div>
+            <div class="confirm-btns">
+                <button class="btn btn-outline" id="conf-cancel">Cancelar</button>
+                <button class="btn btn-danger"  id="conf-ok">Eliminar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#conf-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#conf-ok').onclick = () => { overlay.remove(); onConfirm(); };
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+// ===== MODAL =====
+function openModal() {
+    document.getElementById('scheduleModal').classList.add('active');
+    document.getElementById('scheduleForm').reset();
+    document.getElementById('schedule_id').value = '';
+    document.getElementById('modalTitle').textContent = 'Nuevo Horario de Riego';
+}
+function closeModal() {
+    document.getElementById('scheduleModal').classList.remove('active');
+}
+
+// ===== EDIT =====  ← FUNCIÓN QUE FALTABA
+async function editSchedule(id) {
+    try {
+        const res = await fetch(`/api/schedule/${id}`);
+        if (!res.ok) throw new Error('No encontrado');
+        const s = await res.json();
+
+        document.getElementById('schedule_id').value = s.id;
+        document.getElementById('name').value  = s.name;
+        document.getElementById('time').value  = s.time.substring(0,5);
+        document.getElementById('active').value = s.active ? '1' : '0';
+        document.getElementById('notes').value  = s.notes || '';
+
+        // Marcar checkboxes
+        document.querySelectorAll('input[name="days"]').forEach(cb => {
+            cb.checked = s.days_of_week.split(',').includes(cb.value);
+        });
+
+        document.getElementById('modalTitle').textContent = 'Editar Horario';
+        document.getElementById('scheduleModal').classList.add('active');
+    } catch (e) {
+        showToast('error', 'Error', 'No se pudo cargar el horario');
+    }
+}
+
+// ===== SAVE =====
+async function saveSchedule(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const days = Array.from(document.querySelectorAll('input[name="days"]:checked'))
+        .map(cb => cb.value).join(',');
+
+    if (!days) {
+        showToast('error', 'Sin días', 'Selecciona al menos un día de la semana');
+        return;
+    }
+
+    const data = {
+        name: formData.get('name'),
+        days_of_week: days,
+        time: formData.get('time'),
+        active: formData.get('active'),
+        notes: formData.get('notes')
+    };
+    const scheduleId = formData.get('schedule_id');
+    const url    = scheduleId ? `/api/schedule/${scheduleId}` : '/api/schedule';
+    const method = scheduleId ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+        });
+        if (res.ok) {
+            closeModal();
+            showToast('success', 'Guardado', scheduleId ? 'Horario actualizado correctamente' : 'Horario creado correctamente');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const err = await res.json();
+            showToast('error', 'Error', err.error || 'No se pudo guardar el horario');
+        }
+    } catch (e) {
+        showToast('error', 'Error de red', 'No se pudo conectar con el servidor');
+    }
+}
+
+// ===== DELETE =====
+function deleteSchedule(id, name) {
+    showConfirm(
+        '¿Eliminar horario?',
+        `Se eliminará "<strong>${name}</strong>" permanentemente.`,
+        async () => {
+            try {
+                const res = await fetch(`/api/schedule/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    const row = document.getElementById(`row-${id}`);
+                    if (row) row.remove();
+                    showToast('success', 'Eliminado', `"${name}" fue eliminado`);
+                } else {
+                    showToast('error', 'Error', 'No se pudo eliminar el horario');
+                }
+            } catch (e) {
+                showToast('error', 'Error de red', 'No se pudo conectar con el servidor');
+            }
+        }
+    );
+}
+</script>
+
+<%- include('partials/footer') %>

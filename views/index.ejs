@@ -1,0 +1,193 @@
+<%- include('partials/header') %>
+
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Dashboard General</h1>
+        <p class="page-subtitle">Monitoreo y Control del Cultivo de Orquídeas</p>
+    </div>
+
+    <!-- Tarjetas de Estado -->
+    <div class="cards-grid">
+        <div class="card stat-card">
+            <div class="card-header">
+                <h3 class="card-title">Sensores Activos</h3>
+                <span class="card-icon">📡</span>
+            </div>
+            <div class="card-body">
+                <div class="stat-value" style="color: var(--success-color);">
+                    <%= sensors.filter(s => s.status === 'active').length %>
+                </div>
+                <div class="stat-label">De <%= sensors.length %> total</div>
+            </div>
+        </div>
+
+        <div class="card stat-card">
+            <div class="card-header">
+                <h3 class="card-title">Humedad Promedio</h3>
+                <span class="card-icon">💧</span>
+            </div>
+            <div class="card-body">
+                <div class="stat-value" style="color: var(--secondary-color);">
+                    <% 
+                    const avgHumidity = recentReadings.length > 0 
+                        ? (recentReadings.reduce((sum, r) => sum + parseFloat(r.humidity), 0) / recentReadings.length).toFixed(1)
+                        : 0;
+                    %>
+                    <%= avgHumidity %>%
+                </div>
+                <div class="stat-label">Últimas 24 horas</div>
+                <div class="stat-trend <%= avgHumidity >= 75 && avgHumidity <= 85 ? 'trend-up' : 'trend-down' %>">
+                    <span><%= avgHumidity >= 75 && avgHumidity <= 85 ? '✓' : '⚠' %></span>
+                    <span><%= avgHumidity >= 75 && avgHumidity <= 85 ? 'Óptimo' : 'Fuera de rango' %></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card stat-card">
+            <div class="card-header">
+                <h3 class="card-title">Temperatura Promedio</h3>
+                <span class="card-icon">🌡️</span>
+            </div>
+            <div class="card-body">
+                <div class="stat-value" style="color: var(--warning-color);">
+                    <% 
+                    const avgTemp = recentReadings.length > 0 
+                        ? (recentReadings.reduce((sum, r) => sum + parseFloat(r.temperature), 0) / recentReadings.length).toFixed(1)
+                        : 0;
+                    %>
+                    <%= avgTemp %>°C
+                </div>
+                <div class="stat-label">Últimas 24 horas</div>
+                <div class="stat-trend <%= avgTemp >= 18 && avgTemp <= 24 ? 'trend-up' : 'trend-down' %>">
+                    <span><%= avgTemp >= 18 && avgTemp <= 24 ? '✓' : '⚠' %></span>
+                    <span><%= avgTemp >= 18 && avgTemp <= 24 ? 'Óptimo' : 'Fuera de rango' %></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card stat-card">
+            <div class="card-header">
+                <h3 class="card-title">Alertas Activas</h3>
+                <span class="card-icon">🔔</span>
+            </div>
+            <div class="card-body">
+                <div class="stat-value" style="color: <%= alerts.length > 0 ? 'var(--danger-color)' : 'var(--success-color)' %>;">
+                    <%= alerts.length %>
+                </div>
+                <div class="stat-label">Requieren atención</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas Activas -->
+    <% if (alerts.length > 0) { %>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Alertas Ambientales Activas</h3>
+            <span class="card-icon">⚠️</span>
+        </div>
+        <div class="card-body">
+            <% alerts.forEach(alert => { %>
+            <div class="alert alert-warning">
+                <strong>
+                    <%= alert.alert_type.replace('_', ' ').toUpperCase() %>:
+                </strong>
+                Valor actual: <%= alert.value %> 
+                (Umbral: <%= alert.threshold %>)
+                - <%= new Date(alert.timestamp).toLocaleString('es-CL') %>
+            </div>
+            <% }); %>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Lecturas Recientes -->
+    <div class="table-container">
+        <div class="flex-between mb-2">
+            <h3 class="card-title">Lecturas Recientes</h3>
+            <a href="/history" class="btn btn-outline">Ver Todo el Historial</a>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Sensor</th>
+                    <th>Humedad (%)</th>
+                    <th>Temperatura (°C)</th>
+                    <th>Fecha y Hora</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (recentReadings.length === 0) { %>
+                <tr>
+                    <td colspan="5" class="text-center">No hay lecturas disponibles</td>
+                </tr>
+                <% } else { %>
+                    <% recentReadings.forEach(reading => { 
+                        const humidityOk = reading.humidity >= 75 && reading.humidity <= 85;
+                        const tempOk = reading.temperature >= 18 && reading.temperature <= 24;
+                        const status = humidityOk && tempOk ? 'normal' : 'warning';
+                    %>
+                    <tr>
+                        <td><strong><%= reading.sensor_name %></strong></td>
+                        <td>
+                            <span class="<%= humidityOk ? 'trend-up' : 'trend-down' %>">
+                                <%= reading.humidity %>%
+                            </span>
+                        </td>
+                        <td>
+                            <span class="<%= tempOk ? 'trend-up' : 'trend-down' %>">
+                                <%= reading.temperature %>°C
+                            </span>
+                        </td>
+                        <td><%= new Date(reading.timestamp).toLocaleString('es-CL') %></td>
+                        <td>
+                            <span class="status-badge <%= status === 'normal' ? 'status-active' : 'status-warning' %>">
+                                <%= status === 'normal' ? '✓ Óptimo' : '⚠ Alerta' %>
+                            </span>
+                        </td>
+                    </tr>
+                    <% }); %>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Acciones Rápidas -->
+    <div class="cards-grid mt-3">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Monitoreo en Tiempo Real</h3>
+                <span class="card-icon">📊</span>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">Visualiza los datos de tus sensores en tiempo real con gráficos interactivos.</p>
+                <a href="/dashboard" class="btn btn-primary">Ir al Dashboard</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Calendario de Riego</h3>
+                <span class="card-icon">💦</span>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">Configura y gestiona los horarios de riego para tus orquídeas.</p>
+                <a href="/schedule" class="btn btn-secondary">Gestionar Calendario</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Gestión de Sensores</h3>
+                <span class="card-icon">⚙️</span>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">Conecta, configura y monitorea el estado de tus sensores IoT.</p>
+                <a href="/sensors" class="btn btn-success">Gestionar Sensores</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>

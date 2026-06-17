@@ -1,0 +1,366 @@
+<%- include('partials/header') %>
+
+<!-- ===== TOAST SYSTEM (mismo que schedule) ===== -->
+<div id="toast-container" style="
+    position:fixed;top:1.5rem;right:1.5rem;z-index:9999;
+    display:flex;flex-direction:column;gap:0.75rem;pointer-events:none;
+"></div>
+
+<style>
+.toast {
+    display:flex;align-items:flex-start;gap:0.75rem;
+    padding:1rem 1.25rem;border-radius:12px;min-width:300px;max-width:380px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.18);pointer-events:all;
+    animation:slideIn 0.3s ease;font-size:0.95rem;
+    border-left:4px solid transparent;
+}
+.toast.success { background:#f0fdf4;border-color:#10b981;color:#065f46; }
+.toast.error   { background:#fef2f2;border-color:#ef4444;color:#7f1d1d; }
+.toast.info    { background:#eff6ff;border-color:#3b82f6;color:#1e3a8a; }
+.toast-icon  { font-size:1.2rem;flex-shrink:0;margin-top:0.1rem; }
+.toast-body  { flex:1; }
+.toast-title { font-weight:700;margin-bottom:0.2rem; }
+.toast-msg   { opacity:0.85;font-size:0.875rem; }
+.toast-close { background:none;border:none;cursor:pointer;opacity:0.5;
+               font-size:1.1rem;padding:0;line-height:1;flex-shrink:0; }
+.toast-close:hover { opacity:1; }
+.toast.hiding { animation:slideOut 0.3s ease forwards; }
+@keyframes slideIn  { from{transform:translateX(120%);opacity:0;} to{transform:translateX(0);opacity:1;} }
+@keyframes slideOut { from{transform:translateX(0);opacity:1;} to{transform:translateX(120%);opacity:0;} }
+
+/* confirm */
+.confirm-overlay {
+    position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:8000;
+    display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;
+}
+.confirm-box {
+    background:#fff;border-radius:16px;padding:2rem;max-width:380px;width:90%;
+    box-shadow:0 20px 60px rgba(0,0,0,0.25);text-align:center;animation:popIn 0.2s ease;
+}
+.confirm-icon  { font-size:2.5rem;margin-bottom:0.75rem; }
+.confirm-title { font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:0.5rem; }
+.confirm-msg   { color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.5rem; }
+.confirm-btns  { display:flex;gap:0.75rem;justify-content:center; }
+@keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+@keyframes popIn  { from{transform:scale(0.9);opacity:0;} to{transform:scale(1);opacity:1;} }
+
+/* config modal extra */
+.config-section { border:1px solid var(--border-color);border-radius:8px;padding:1rem;margin-bottom:1rem; }
+.config-section-title { font-weight:600;margin-bottom:0.75rem;color:var(--text-primary); }
+</style>
+
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Gestión de Sensores</h1>
+        <p class="page-subtitle">Conecta y configura tus sensores IoT</p>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header flex-between">
+            <h3 class="card-title">Sensores Registrados</h3>
+            <button class="btn btn-primary" onclick="openSensorModal()">➕ Conectar Nuevo Sensor</button>
+        </div>
+        <div class="card-body">
+            <% if (sensors.length === 0) { %>
+                <div class="alert alert-info">
+                    <span>ℹ️</span>
+                    <span>No hay sensores registrados. Conecta tu primer sensor para comenzar.</span>
+                </div>
+            <% } else { %>
+                <div class="cards-grid" id="sensors-grid">
+                    <% sensors.forEach(sensor => { %>
+                    <div class="card" id="sensor-card-<%= sensor.id %>">
+                        <div class="card-header">
+                            <h4 class="card-title"><%= sensor.name %></h4>
+                            <span class="status-badge <%= sensor.status === 'active' ? 'status-active' : sensor.status === 'inactive' ? 'status-inactive' : 'status-error' %>">
+                                <%= sensor.status === 'active' ? '● Activo' : sensor.status === 'inactive' ? '○ Inactivo' : '✕ Error' %>
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div style="margin-bottom:0.75rem;">
+                                <strong>Tipo:</strong>
+                                <%= sensor.type === 'combined' ? 'Humedad y Temperatura' : sensor.type === 'humidity' ? 'Humedad' : 'Temperatura' %>
+                            </div>
+                            <div style="margin-bottom:0.75rem;">
+                                <strong>Conexión:</strong> <span style="text-transform:uppercase;"><%= sensor.connection_type %></span>
+                            </div>
+                            <div style="margin-bottom:0.75rem;">
+                                <strong>MAC:</strong> <%= sensor.mac_address %>
+                            </div>
+                            <div style="margin-bottom:0.75rem;">
+                                <strong>Ubicación:</strong> <%= sensor.location || 'No especificada' %>
+                            </div>
+                            <div style="margin-bottom:1rem;font-size:0.875rem;color:var(--text-secondary);">
+                                Registrado: <%= new Date(sensor.created_at).toLocaleDateString('es-CL') %>
+                            </div>
+                            <div class="flex gap-2">
+                                <!-- FIX: ambos botones ahora tienen onclick funcional -->
+                                <button class="btn btn-secondary" style="flex:1;font-size:0.875rem;"
+                                    onclick="openConfigModal(<%= sensor.id %>, '<%= sensor.name %>', '<%= sensor.status %>', '<%= sensor.location || '' %>')">
+                                    ⚙️ Configurar
+                                </button>
+                                <button class="btn btn-danger" style="font-size:0.875rem;"
+                                    onclick="deleteSensor(<%= sensor.id %>, '<%= sensor.name %>')">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <% }); %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Info -->
+    <div class="cards-grid">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Conexión WiFi</h3><span class="card-icon">📶</span></div>
+            <div class="card-body">
+                <ol style="padding-left:1.5rem;">
+                    <li style="margin-bottom:0.5rem;">Enciende el sensor y espera el modo de configuración (LED parpadeante)</li>
+                    <li style="margin-bottom:0.5rem;">Conecta tu dispositivo a la red WiFi del sensor</li>
+                    <li style="margin-bottom:0.5rem;">Accede al portal de configuración (192.168.4.1)</li>
+                    <li style="margin-bottom:0.5rem;">Selecciona tu red WiFi e ingresa la contraseña</li>
+                    <li style="margin-bottom:0.5rem;">Registra el sensor usando su dirección MAC</li>
+                </ol>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Conexión Bluetooth</h3><span class="card-icon">📲</span></div>
+            <div class="card-body">
+                <ol style="padding-left:1.5rem;">
+                    <li style="margin-bottom:0.5rem;">Activa Bluetooth en tu dispositivo</li>
+                    <li style="margin-bottom:0.5rem;">Enciende el sensor y presiona el botón de emparejamiento</li>
+                    <li style="margin-bottom:0.5rem;">Busca el sensor en dispositivos disponibles</li>
+                    <li style="margin-bottom:0.5rem;">Empareja el dispositivo (PIN: 0000 o 1234)</li>
+                    <li style="margin-bottom:0.5rem;">Registra el sensor en la aplicación</li>
+                </ol>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Solución de Problemas</h3><span class="card-icon">🔧</span></div>
+            <div class="card-body">
+                <ul style="list-style:none;padding:0;">
+                    <li style="margin-bottom:0.5rem;"><strong>Sensor no responde:</strong> Verifica la batería o alimentación</li>
+                    <li style="margin-bottom:0.5rem;"><strong>No se conecta:</strong> Reinicia el sensor y el router</li>
+                    <li style="margin-bottom:0.5rem;"><strong>Lecturas incorrectas:</strong> Calibra el sensor o reemplázalo</li>
+                    <li style="margin-bottom:0.5rem;"><strong>Desconexiones:</strong> Acerca el sensor al router</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuevo Sensor -->
+<div class="modal" id="sensorModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Conectar Nuevo Sensor</h3>
+            <button class="modal-close" onclick="closeSensorModal()">✕</button>
+        </div>
+        <form id="sensorForm" onsubmit="saveSensor(event)">
+            <div class="form-group">
+                <label class="form-label">Nombre del Sensor</label>
+                <input type="text" class="form-input" id="sensor_name" name="name" required placeholder="Ej: Sensor Principal">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tipo de Sensor</label>
+                <select class="form-select" id="sensor_type" name="type" required>
+                    <option value="combined">Humedad y Temperatura</option>
+                    <option value="humidity">Solo Humedad</option>
+                    <option value="temperature">Solo Temperatura</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tipo de Conexión</label>
+                <select class="form-select" id="connection_type" name="connection_type" required>
+                    <option value="wifi">WiFi</option>
+                    <option value="bluetooth">Bluetooth</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Dirección MAC</label>
+                <input type="text" class="form-input" id="mac_address" name="mac_address" required
+                    placeholder="AA:BB:CC:DD:EE:FF" pattern="^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$">
+                <small style="color:var(--text-secondary);font-size:0.875rem;">Formato: AA:BB:CC:DD:EE:FF</small>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Ubicación</label>
+                <input type="text" class="form-input" id="location" name="location" placeholder="Ej: Invernadero Principal">
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary" style="flex:1;">Conectar Sensor</button>
+                <button type="button" class="btn btn-outline" onclick="closeSensorModal()" style="flex:1;">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Configurar Sensor -->
+<div class="modal" id="configModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="configModalTitle">Configurar Sensor</h3>
+            <button class="modal-close" onclick="closeConfigModal()">✕</button>
+        </div>
+        <input type="hidden" id="config_sensor_id">
+        <div class="config-section">
+            <div class="config-section-title">📍 Ubicación</div>
+            <div class="form-group" style="margin-bottom:0;">
+                <input type="text" class="form-input" id="config_location" placeholder="Ej: Invernadero Zona A">
+            </div>
+        </div>
+        <div class="config-section">
+            <div class="config-section-title">🔌 Estado del Sensor</div>
+            <div class="flex gap-2">
+                <button class="btn btn-success" style="flex:1;" onclick="setStatus('active')">● Activar</button>
+                <button class="btn btn-outline"  style="flex:1;" onclick="setStatus('inactive')">○ Desactivar</button>
+                <button class="btn btn-danger"   style="flex:1;" onclick="setStatus('error')">✕ Error</button>
+            </div>
+        </div>
+        <div class="flex gap-2" style="margin-top:1rem;">
+            <button class="btn btn-primary" style="flex:1;" onclick="saveConfig()">Guardar</button>
+            <button class="btn btn-outline" style="flex:1;" onclick="closeConfigModal()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== TOAST =====
+function showToast(type, title, msg) {
+    const icons = {success:'✅',error:'❌',info:'ℹ️'};
+    const container = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `
+        <span class="toast-icon">${icons[type]||'💬'}</span>
+        <div class="toast-body">
+            <div class="toast-title">${title}</div>
+            <div class="toast-msg">${msg}</div>
+        </div>
+        <button class="toast-close" onclick="removeToast(this.parentElement)">✕</button>
+    `;
+    container.appendChild(t);
+    setTimeout(() => removeToast(t), 4000);
+}
+function removeToast(t) {
+    if (!t || t.classList.contains('hiding')) return;
+    t.classList.add('hiding');
+    setTimeout(() => t.remove(), 300);
+}
+
+// ===== CONFIRM =====
+function showConfirm(title, msg, onConfirm) {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+        <div class="confirm-box">
+            <div class="confirm-icon">⚠️</div>
+            <div class="confirm-title">${title}</div>
+            <div class="confirm-msg">${msg}</div>
+            <div class="confirm-btns">
+                <button class="btn btn-outline" id="conf-cancel">Cancelar</button>
+                <button class="btn btn-danger"  id="conf-ok">Eliminar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#conf-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#conf-ok').onclick = () => { overlay.remove(); onConfirm(); };
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+// ===== NUEVO SENSOR =====
+function openSensorModal()  { document.getElementById('sensorModal').classList.add('active'); document.getElementById('sensorForm').reset(); }
+function closeSensorModal() { document.getElementById('sensorModal').classList.remove('active'); }
+
+async function saveSensor(event) {
+    event.preventDefault();
+    const fd = new FormData(event.target);
+    const data = {
+        name: fd.get('name'), type: fd.get('type'),
+        connection_type: fd.get('connection_type'),
+        mac_address: fd.get('mac_address'), location: fd.get('location')
+    };
+    try {
+        const res = await fetch('/api/sensors', {
+            method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+        });
+        if (res.ok) {
+            closeSensorModal();
+            showToast('success','Sensor conectado','El sensor fue registrado correctamente');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const err = await res.json();
+            showToast('error','Error', err.error || 'No se pudo conectar el sensor');
+        }
+    } catch(e) {
+        showToast('error','Error de red','No se pudo conectar con el servidor');
+    }
+}
+
+// ===== CONFIGURAR SENSOR =====  ← FUNCIÓN QUE FALTABA
+let _configStatus = 'active';
+
+function openConfigModal(id, name, status, location) {
+    _configStatus = status;
+    document.getElementById('config_sensor_id').value = id;
+    document.getElementById('configModalTitle').textContent = `⚙️ Configurar: ${name}`;
+    document.getElementById('config_location').value = location;
+    document.getElementById('configModal').classList.add('active');
+}
+function closeConfigModal() {
+    document.getElementById('configModal').classList.remove('active');
+}
+function setStatus(s) {
+    _configStatus = s;
+    const labels = {active:'Activo', inactive:'Inactivo', error:'Error'};
+    showToast('info','Estado seleccionado', `Se guardará como: ${labels[s]}`);
+}
+
+async function saveConfig() {
+    const id       = document.getElementById('config_sensor_id').value;
+    const location = document.getElementById('config_location').value;
+    try {
+        const res = await fetch(`/api/sensors/${id}`, {
+            method:'PUT',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ status: _configStatus, location })
+        });
+        if (res.ok) {
+            closeConfigModal();
+            showToast('success','Configuración guardada','El sensor fue actualizado');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast('error','Error','No se pudo actualizar el sensor');
+        }
+    } catch(e) {
+        showToast('error','Error de red','No se pudo conectar con el servidor');
+    }
+}
+
+// ===== ELIMINAR SENSOR =====  ← FUNCIÓN QUE FALTABA
+function deleteSensor(id, name) {
+    showConfirm(
+        '¿Eliminar sensor?',
+        `Se eliminará "<strong>${name}</strong>" y todas sus lecturas permanentemente.`,
+        async () => {
+            try {
+                const res = await fetch(`/api/sensors/${id}`, { method:'DELETE' });
+                if (res.ok) {
+                    const card = document.getElementById(`sensor-card-${id}`);
+                    if (card) card.remove();
+                    showToast('success','Sensor eliminado',`"${name}" fue eliminado`);
+                } else {
+                    showToast('error','Error','No se pudo eliminar el sensor');
+                }
+            } catch(e) {
+                showToast('error','Error de red','No se pudo conectar con el servidor');
+            }
+        }
+    );
+}
+</script>
+
+<%- include('partials/footer') %>

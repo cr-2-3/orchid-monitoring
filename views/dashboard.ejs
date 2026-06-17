@@ -1,0 +1,280 @@
+<%- include('partials/header') %>
+
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Monitoreo en Tiempo Real</h1>
+        <p class="page-subtitle">Visualización en vivo de las condiciones ambientales</p>
+    </div>
+
+    <!-- Configuración de Umbrales -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h3 class="card-title">Parámetros Óptimos Configurados</h3>
+            <span class="card-icon">⚙️</span>
+        </div>
+        <div class="card-body">
+            <div class="cards-grid">
+                <div>
+                    <strong>Humedad:</strong> <%= config.humidity_min %>% - <%= config.humidity_max %>%
+                </div>
+                <div>
+                    <strong>Temperatura:</strong> <%= config.temp_min %>°C - <%= config.temp_max %>°C
+                </div>
+                <div>
+                    <strong>Frecuencia de Lectura:</strong> Cada <%= config.reading_frequency %> minutos
+                </div>
+                <div>
+                    <strong>Alertas:</strong> 
+                    <span class="status-badge <%= config.alert_enabled === '1' ? 'status-active' : 'status-inactive' %>">
+                        <%= config.alert_enabled === '1' ? '✓ Activadas' : '✗ Desactivadas' %>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicadores en Tiempo Real -->
+    <div class="cards-grid">
+        <div class="card stat-card">
+            <div class="card-header">
+                <h3 class="card-title">Humedad Actual</h3>
+                <span class="card-icon">💧</span>
+            </div>
+            <div class="card-body">
+                <div class="stat-value" style="color: var(--secondary-color);" id="current-humidity">
+                    --
+                </div>
+                <div class="stat-label">% Humedad Relativa</div>
+                <div class="progress-bar mt-2">
+                    <div class="progress-fill" id="humidity-progress" style="width: 0%; background: var(--secondary-color); height: 10px; border-radius: 5px; transition: width 0.5s;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card stat-card">
+            <div class="card-header">
+                <h3 class="card-title">Temperatura Actual</h3>
+                <span class="card-icon">🌡️</span>
+            </div>
+            <div class="card-body">
+                <div class="stat-value" style="color: var(--warning-color);" id="current-temperature">
+                    --
+                </div>
+                <div class="stat-label">Grados Celsius</div>
+                <div class="progress-bar mt-2">
+                    <div class="progress-fill" id="temperature-progress" style="width: 0%; background: var(--warning-color); height: 10px; border-radius: 5px; transition: width 0.5s;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card stat-card">
+            <div class="card-header">
+                <h3 class="card-title">Última Actualización</h3>
+                <span class="card-icon">🕐</span>
+            </div>
+            <div class="card-body">
+                <div class="stat-value" style="color: var(--primary-color); font-size: 1.5rem;" id="last-update">
+                    Cargando...
+                </div>
+                <div class="stat-label">Tiempo transcurrido</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="cards-grid mt-3">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Historial de Humedad</h3>
+                <span class="card-icon">📈</span>
+            </div>
+            <div class="card-body">
+                <canvas id="humidity-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Historial de Temperatura</h3>
+                <span class="card-icon">📉</span>
+            </div>
+            <div class="card-body">
+                <canvas id="temperature-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Lecturas en Vivo -->
+    <div class="table-container mt-3">
+        <div class="flex-between mb-2">
+            <h3 class="card-title">Lecturas en Tiempo Real</h3>
+            <span class="status-badge status-active" id="connection-status">
+                ● Conectado
+            </span>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Hora</th>
+                    <th>Sensor</th>
+                    <th>Humedad (%)</th>
+                    <th>Temperatura (°C)</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody id="live-readings">
+                <tr>
+                    <td colspan="5" class="text-center">Esperando datos...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Configuración de gráficos
+    const humidityData = {
+        labels: [],
+        datasets: [{
+            label: 'Humedad (%)',
+            data: [],
+            borderColor: 'rgb(6, 182, 212)',
+            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    };
+
+    const temperatureData = {
+        labels: [],
+        datasets: [{
+            label: 'Temperatura (°C)',
+            data: [],
+            borderColor: 'rgb(245, 158, 11)',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    };
+
+    const chartConfig = {
+        type: 'line',
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2,
+            plugins: {
+                legend: {
+                    display: true
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false
+                }
+            }
+        }
+    };
+
+    const humidityChart = new Chart(
+        document.getElementById('humidity-chart'),
+        { ...chartConfig, data: humidityData }
+    );
+
+    const temperatureChart = new Chart(
+        document.getElementById('temperature-chart'),
+        { ...chartConfig, data: temperatureData }
+    );
+
+    // Actualizar datos cada 5 segundos
+    async function updateData() {
+        try {
+            const response = await fetch('/api/readings/recent?limit=20');
+            const readings = await response.json();
+            
+            if (readings.length > 0) {
+                const latest = readings[0];
+                
+                // Actualizar valores actuales
+                document.getElementById('current-humidity').textContent = `${latest.humidity}%`;
+                document.getElementById('current-temperature').textContent = `${latest.temperature}°C`;
+                
+                // Actualizar barras de progreso
+                const humidityPercent = (latest.humidity / 100) * 100;
+                const tempPercent = ((latest.temperature - 10) / 20) * 100; // Escala 10-30°C
+                document.getElementById('humidity-progress').style.width = `${humidityPercent}%`;
+                document.getElementById('temperature-progress').style.width = `${tempPercent}%`;
+                
+                // Actualizar tiempo
+                const timeAgo = getTimeAgo(new Date(latest.timestamp));
+                document.getElementById('last-update').textContent = timeAgo;
+                
+                // Actualizar gráficos
+                updateCharts(readings.reverse());
+                
+                // Actualizar tabla
+                updateTable(readings.slice(-10).reverse());
+            }
+        } catch (error) {
+            console.error('Error al actualizar datos:', error);
+            document.getElementById('connection-status').textContent = '● Error de conexión';
+            document.getElementById('connection-status').className = 'status-badge status-error';
+        }
+    }
+
+    function updateCharts(readings) {
+        humidityData.labels = readings.map(r => new Date(r.timestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }));
+        humidityData.datasets[0].data = readings.map(r => parseFloat(r.humidity));
+        
+        temperatureData.labels = readings.map(r => new Date(r.timestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }));
+        temperatureData.datasets[0].data = readings.map(r => parseFloat(r.temperature));
+        
+        humidityChart.update();
+        temperatureChart.update();
+    }
+
+    function updateTable(readings) {
+        const tbody = document.getElementById('live-readings');
+        tbody.innerHTML = readings.map(r => {
+            const humidityOk = r.humidity >= 75 && r.humidity <= 85;
+            const tempOk = r.temperature >= 18 && r.temperature <= 24;
+            const status = humidityOk && tempOk ? 'normal' : 'warning';
+            
+            return `
+                <tr>
+                    <td>${new Date(r.timestamp).toLocaleTimeString('es-CL')}</td>
+                    <td><strong>${r.sensor_name}</strong></td>
+                    <td class="${humidityOk ? 'trend-up' : 'trend-down'}">${r.humidity}%</td>
+                    <td class="${tempOk ? 'trend-up' : 'trend-down'}">${r.temperature}°C</td>
+                    <td>
+                        <span class="status-badge ${status === 'normal' ? 'status-active' : 'status-warning'}">
+                            ${status === 'normal' ? '✓ Óptimo' : '⚠ Alerta'}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function getTimeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'Hace ' + seconds + 's';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return 'Hace ' + minutes + 'm';
+        const hours = Math.floor(minutes / 60);
+        return 'Hace ' + hours + 'h';
+    }
+
+    // Actualizar cada 5 segundos
+    updateData();
+    setInterval(updateData, 5000);
+
+    // Escuchar nuevas lecturas via WebSocket
+    socket.on('newReading', (data) => {
+        console.log('Nueva lectura recibida via WebSocket:', data);
+        updateData();
+    });
+</script>
+
+<%- include('partials/footer') %>
